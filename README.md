@@ -13,7 +13,6 @@ It works by modifying internal kernel structures (`EPROCESS.ActiveProcessLinks`)
 - Windows Kernel Driver (WDM)
 - Uses DKOM to unlink a process from the active process list
 - Communicates with user-mode app via IOCTL (DeviceIoControl)
-- User-mode app hides the current process
 - Tested on Windows 11
 
 ## How It Works

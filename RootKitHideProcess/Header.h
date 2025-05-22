@@ -5,6 +5,10 @@
 #define DATA_FROM_USER_SIZE sizeof(DATA_FROM_USER)
 #define DATA_TO_USER_SIZE sizeof(DATA_TO_USER)
 
+// change according to windows version..
+#define UniqueProcessIdOffset		(UINT64)0x1d0
+#define ActiveProcessLinksOffset	(UINT64)0x1d8
+
 // FROM USER TO KERNEL..
 typedef struct _DATA_FROM_USER
 {

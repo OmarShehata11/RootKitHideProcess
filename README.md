@@ -70,7 +70,7 @@ sc start RootKit
 
 This project is built and tested on **Windows 11**.
 
-To use it on other Windows versions (e.g., Windows 10), update the `EPROCESS` offsets in the kernel driver:
+To use it on other Windows versions (e.g., Windows 10), update the `EPROCESS` offsets in the kernel driver Header:
 
 ```c
 // change according to windows version..

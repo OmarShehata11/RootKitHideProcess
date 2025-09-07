@@ -52,7 +52,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 	NTSTATUS status;
 	UNICODE_STRING SymLinkName, DeviceName;
 	PDEVICE_OBJECT DeviceObject;
-	PKLDR_DATA_TABLE_ENTRY tableEntry = NULL;
 
 	RtlInitUnicodeString(&SymLinkName, L"\\??\\RootKitSym");
 	RtlInitUnicodeString(&DeviceName, L"\\Device\\RootKitDevice");
@@ -62,28 +61,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = RKDeviceControl;
 	DriverObject->MajorFunction[IRP_MJ_READ] = DriverObject->MajorFunction[IRP_MJ_WRITE] = RKReadWrite;
 	DriverObject->DriverUnload = RKUnload;
-	
-	tableEntry = (PKLDR_DATA_TABLE_ENTRY)DriverObject->DriverSection;
-
-	if (tableEntry == NULL)
-	{
-		KdPrint(("[--] error while getting the module entry."));
-	}
-	else
-	{
-		KdPrint(("[+] the address of module entry is : %x", tableEntry));
-		if (tableEntry->FullDllName.Buffer != NULL)
-		{
-			KdPrint(("[+++] the drive FULL DLLL NAME is: %wZ", tableEntry->FullDllName));
-			KdPrint(("[+++] & Driver Base Dll Name is: %wZ", tableEntry->BaseDllName));
-			KdPrint(("[+++] lastly the driver name from driver object is : %wZ", DriverObject->DriverName));
-		}
-		else
-		{
-			KdPrint(("[---] error while getting the driver name from module entry."));
-		}
-	}
-
 
 	status = IoCreateDevice(DriverObject, 0, &DeviceName, FILE_DEVICE_UNKNOWN, NULL, FALSE, &DeviceObject);
 

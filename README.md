@@ -1,10 +1,11 @@
-# Windows Rootkit – DKOM Process Hider
+# Windows Rootkit – DKOM Process/Driver Hider
 
 ## Overview
 
-This project is a basic Windows kernel rootkit demonstrating **Direct Kernel Object Manipulation (DKOM)** to hide a user-mode process based on its PID.
+This project is a basic Windows kernel rootkit demonstrating **Direct Kernel Object Manipulation (DKOM)** to hide both a user-mode process (by PID) and the kernel driver itself.
 
-It works by modifying internal kernel structures (`EPROCESS.ActiveProcessLinks`) to remove the target process from the system’s active process list, making it invisible to enumeration tools like Task Manager or Process Hacker — while the process continues running.
+- For process hiding, it modifies internal kernel structures (`EPROCESS.ActiveProcessLinks`) to unlink the target process from the system’s active process list, making it invisible to enumeration tools like Task Manager or Process Hacker — while the process continues running.
+- For driver hiding, it unlinks the driver’s loader entry (`KLDR_DATA_TABLE_ENTRY.InLoadOrderLinks`) so it does not appear in typical module/driver enumeration lists.
 
 **Educational use only — Do not run this on production systems or any machine you do not fully control.**
 
@@ -12,9 +13,9 @@ It works by modifying internal kernel structures (`EPROCESS.ActiveProcessLinks`)
 
 - Windows Kernel Driver (WDM)
 - Uses DKOM to unlink a process from the active process list
+- Hides the kernel driver by unlinking `KLDR_DATA_TABLE_ENTRY.InLoadOrderLinks`
 - Communicates with user-mode app via IOCTL (DeviceIoControl)
 - Tested on Windows 11
-- Can hide the kernel driver from module enumeration by unlinking `KLDR_DATA_TABLE_ENTRY.InLoadOrderLinks`
 
 ## How It Works
 
@@ -28,25 +29,26 @@ It works by modifying internal kernel structures (`EPROCESS.ActiveProcessLinks`)
    - Sends the PID to the kernel driver
    - Receives confirmation of success/failure
 
-3. Hiding the kernel driver:
+3. Driver hiding (core capability):
    - Identifies its loader entry (`KLDR_DATA_TABLE_ENTRY`) from `DriverObject->DriverSection`
    - Unlinks `InLoadOrderLinks` by fixing neighbors’ `Flink`/`Blink`
    - Self-points the driver’s list links so it no longer appears in typical loader/module enumerations
 
 ## Project Structure
 
-| File/Folder                   | Description                                      |
-|------------------------------|--------------------------------------------------|
-| `Rootkit.c`                  | Kernel-mode driver source code                   |
-| `Header.h`                   | Shared header with IOCTL definitions             |
-| `RootKitUserApp.cpp`         | User-mode application to trigger process hiding  |
-| `README.md`                  | This file                                        |
+| File/Folder                               | Description                                       |
+|-------------------------------------------|---------------------------------------------------|
+| `RootKitHideProcess/Source.cpp`           | Kernel-mode driver source code                    |
+| `RootKitHideProcess/Header.h`             | Shared header with IOCTL and offset definitions   |
+| `RootKitHideProcess/DriverHeader.h`       | Loader entry (`KLDR_DATA_TABLE_ENTRY`) definition |
+| `RootKitTargetProcess/Source.cpp`         | User-mode application to trigger hide operations  |
+| `README.md`                               | This file                                         |
 
 ## Usage
 
 ### Build and Load the Driver
 
-1. Open the driver project in Visual Studio with WDK installed.
+1. Open the driver project (`RootKitHideProcess`) in Visual Studio with WDK installed.
 2. Compile in **x64 Debug** mode.
 3. Disable driver signature enforcement or enable test signing.
 4. Load the driver using the following commands:
@@ -58,13 +60,13 @@ sc start RootKit
 
 ### Run the User-Mode App
 
-1. Compile the `RootKitUserApp.cpp` in Visual Studio.
+1. Open and build the user app project (`RootKitTargetProcess`) in Visual Studio.
 2. Run the resulting executable as Administrator.
 3. The app will:
    - Print its own PID
-   - Wait for a key press
+   - Wait for your selection
    - Send the PID to the kernel driver to hide the process
-   - Optionally request the driver to hide itself from module lists
+   - Or request the driver to hide itself from module lists
    - Report whether the process was hidden
 
 ### Hide the Kernel Driver
@@ -74,8 +76,10 @@ sc start RootKit
 
 ### Test Result
 
-- Before hiding, locate your process in Task Manager or Process Hacker.
-- After hiding, it should disappear but remain running.
+- Before process hiding, locate your process in Task Manager or Process Hacker.
+- After process hiding, it should disappear but remain running.
+- Before driver hiding, enumerate loaded drivers/modules using your preferred tool.
+- After driver hiding, the driver should no longer appear in module/driver lists.
 
 ## Windows Compatibility
 

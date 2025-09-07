@@ -14,6 +14,7 @@ It works by modifying internal kernel structures (`EPROCESS.ActiveProcessLinks`)
 - Uses DKOM to unlink a process from the active process list
 - Communicates with user-mode app via IOCTL (DeviceIoControl)
 - Tested on Windows 11
+- Can hide the kernel driver from module enumeration by unlinking `KLDR_DATA_TABLE_ENTRY.InLoadOrderLinks`
 
 ## How It Works
 
@@ -26,6 +27,11 @@ It works by modifying internal kernel structures (`EPROCESS.ActiveProcessLinks`)
    - Retrieves its own PID
    - Sends the PID to the kernel driver
    - Receives confirmation of success/failure
+
+3. Hiding the kernel driver:
+   - Identifies its loader entry (`KLDR_DATA_TABLE_ENTRY`) from `DriverObject->DriverSection`
+   - Unlinks `InLoadOrderLinks` by fixing neighbors’ `Flink`/`Blink`
+   - Self-points the driver’s list links so it no longer appears in typical loader/module enumerations
 
 ## Project Structure
 
@@ -57,8 +63,14 @@ sc start RootKit
 3. The app will:
    - Print its own PID
    - Wait for a key press
-   - Send the PID to the kernel driver
+   - Send the PID to the kernel driver to hide the process
+   - Optionally request the driver to hide itself from module lists
    - Report whether the process was hidden
+
+### Hide the Kernel Driver
+
+- Trigger via the user-mode app option for driver hiding, which sends `RK_CTL_DRIVER_HIDE`.
+- The driver unlinks its own loader entry (`InLoadOrderLinks`) so tools that enumerate loaded modules will not list it.
 
 ### Test Result
 
@@ -83,7 +95,7 @@ These values can vary by build. Use WinDbg or Rekall to determine the correct of
 
 - Device name: `\Device\RootKitDevice`
 - Symbolic link: `\??\RootKitSym`
-- Custom IOCTL: `RK_CTL`
+- Custom IOCTLs: `RK_CTL_PROCESS_HIDE`, `RK_CTL_DRIVER_HIDE`
 - The rootkit does not terminate the process; it only hides it from enumeration
 
 ## Disclaimer

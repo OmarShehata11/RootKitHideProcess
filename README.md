@@ -38,17 +38,17 @@ This project is a basic Windows kernel rootkit demonstrating **Direct Kernel Obj
 
 | File/Folder                               | Description                                       |
 |-------------------------------------------|---------------------------------------------------|
-| `RootKitHideProcess/Source.cpp`           | Kernel-mode driver source code                    |
-| `RootKitHideProcess/Header.h`             | Shared header with IOCTL and offset definitions   |
-| `RootKitHideProcess/DriverHeader.h`       | Loader entry (`KLDR_DATA_TABLE_ENTRY`) definition |
-| `RootKitTargetProcess/Source.cpp`         | User-mode application to trigger hide operations  |
+| `RootKitKernelDriver/Source.cpp`           | Kernel-mode driver source code                    |
+| `RootKitKernelDriver/Header.h`             | Shared header with IOCTL and offset definitions   |
+| `RootKitKernelDriver/DriverHeader.h`       | Loader entry (`KLDR_DATA_TABLE_ENTRY`) definition |
+| `RootKitUserProcess/Source.cpp`         | User-mode application to trigger hide operations  |
 | `README.md`                               | This file                                         |
 
 ## Usage
 
 ### Build and Load the Driver
 
-1. Open the driver project (`RootKitHideProcess`) in Visual Studio with WDK installed.
+1. Open the driver project (`RootKitKernelDriver`) in Visual Studio with WDK installed.
 2. Compile in **x64 Debug** mode.
 3. Disable driver signature enforcement or enable test signing.
 4. Load the driver using the following commands:
@@ -60,7 +60,7 @@ sc start RootKit
 
 ### Run the User-Mode App
 
-1. Open and build the user app project (`RootKitTargetProcess`) in Visual Studio.
+1. Open and build the user app project (`RootKitUserProcess`) in Visual Studio.
 2. Run the resulting executable as Administrator.
 3. The app will:
    - Print its own PID

